@@ -4,6 +4,8 @@ $attr = array(
     'pdo' => true,
     'type' => 'mysql',
     'name' => 'test',
+    //sub add _ character
+    'table_prefix' => '',
 );
 
 $dbconfig = array(

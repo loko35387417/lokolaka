@@ -2,13 +2,12 @@
 
 class LokoController extends BaseController
 {
-    public function __construct() {
-        parent::__construct();
+    public function __construct($table = false) {
+        parent::__construct($table);
     }
     
     public function index()
     {
-        $model = new LokoModel;
-        
+        $data = $this->model->getData();
     }
 }
