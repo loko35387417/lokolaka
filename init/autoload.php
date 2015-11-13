@@ -3,14 +3,23 @@
 // require_once(dirname(__FILE__).'/tkn/CUsmAutoLoader.php');
 session_save_path(dirname(dirname(__FILE__)) .'/sessions');
 
-defined('DB_NAME') or define('DB_NAME', 'rapport_new');
 defined('SITE_NAME') or define('SITE_NAME', 'Rapport');
-defined('CLASS_PATH') or define('CLASS_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR . 'includes');
+
+$classPath = array(
+    'model',
+    'controller',
+);
 
 function autoload($class)
 {
-    $classPath = CLASS_PATH;
-    $result = loadClass($classPath, $class);
+    $classPath = array(
+        'init',
+        'model',
+        'controller',
+    ); 
+    foreach ($classPath as $path) {
+        $result = loadClass($path, $class);
+    }
 }
 
 function loadClass($classPath, $class)
