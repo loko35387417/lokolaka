@@ -12,7 +12,9 @@ class BaseController extends Base
     public function initModel($table)
     {
         $model = false;
-        $referenceClass = array_pop(debug_backtrace())['class'];
+        $referenceClass = debug_backtrace();
+        $referenceClass = array_pop($referenceClass)['class'];
+//        $referenceClass = $referenceClass['class'];
         $modelName = preg_replace('/(.*)([A-Z].*)/', '$1', $referenceClass);
         $modelClass = $modelName . 'Model'; 
         try {
