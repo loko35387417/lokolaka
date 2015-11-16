@@ -1,3 +1,4 @@
 nbproject/*
 logs/*
 /StraightUp/nbproject/private/
+/config/db.php

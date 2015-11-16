@@ -18,7 +18,7 @@ if ($_SERVER['REMOTE_ADDR'] === '127.0.0.1') {
     $dbconfig = array(
         'host' =>  'localhost',
         'user' => 'root',
-        'pawd' => '123456',
+        'pawd' => '',
         'port' => 3306,
     );
     
