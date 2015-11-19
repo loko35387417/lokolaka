@@ -2,9 +2,11 @@
 
 class Database extends Base
 {
-    private $action = false;
+    public $action = false;
     
-    private $limit = '';
+    public $limit = '';
+    
+    public $token;
     
     public $db;
     
@@ -16,29 +18,34 @@ class Database extends Base
     
     public $from = 'from';
     
-    private $insertField = '';
+    public $insertField = '';
+    
+    public $join = array();
     
     public $table = fasle;
     
     public $totalRow = 0;
     
-    private $select = false;
+    public $select = false;
     
-    private $set = false;
+    public $set = false;
     
     public $result = array();
     
-    private $tmpTable;
+    public $tmpTable;
 
-    private $where = false;
+    public $where = false;
     
     public $groupBy = false;
     
     public $orderBy = false;
     
+    public $lastInsertId = false;
+    
     public function __construct() 
     {
         parent::__construct();
+        $this->token = time();
         $this->db = $this->getConnect();
     }
     
@@ -71,11 +78,11 @@ class Database extends Base
             $this->insertBuild();
         }
         
-        $this->query();
+        return $this->query();
         
     }
     
-    private function beforeQuery()
+    public function beforeQuery()
     {
         $this->stmt = $this->db->prepare($this->sql);
     }
@@ -84,16 +91,35 @@ class Database extends Base
     {
         $this->stmt = $this->db->prepare($this->sql);
         $this->stmt->execute();
-        $this->afterQuery();
-        we();
+        return $this->afterQuery();
     }
     
-    private function afterQuery()
+    private function afterQuery($fetchType = true)
     {
-        w($this->sql);
-        if ($this->stmt->rowCount()) {
-            we(123);
+        switch (strtolower(trim($this->action))) {
+            case 'insert' :
+                $this->result = $this->db->lastInsertId();
+                $this->lastInsertId = $this->db->lastInsertId();;
+                break;
+            case 'update' :
+                $this->result = $this->stmt->rowCount() ? $this->stmt->rowCount() : 0;
+                break;
+            case 'delete' :
+                $this->result = $this->stmt->rowCount() ? $this->stmt->rowCount() : 0;
+                break;
+            case 'select' :
+                if ($this->stmt->rowCount()) {
+                    $this->totalRow = $this->stmt->rowCount() ? $this->stmt->rowCount() : 0;
+                    $this->result = $this->stmt->fetchAll($fetchType ? PDO::FETCH_NUM : PDO::FETCH_ASSOC);
+                } else {
+                    //statement
+                }
+                break;
+            default :
+                break;
         }
+        
+        return $this->result;
     }
     
     public function attr($arr = array())
@@ -129,14 +155,34 @@ class Database extends Base
         echo 'save sql';
     }
     
-    public function update()
+    public function update($sql = false)
     {
+        if (empty($this->tmpTable)) {
+            $this->tmpTable = $this->table;
+        }
+
+        if ($sql) {
+            $this->updateBuild();
+        } else {
+            $this->sql = $sql;
+        }
+        we($this->sql);
+        $this->updateBuild();
         
+        return $this->query();
     }
     
     public function delete()
     {
+        $list = func_get_args();
+        $this->action = $this->resolve(__FUNCTION__);
+        if (count($list) === 1 && !is_numeric($list[0])) {
+            $list = array_pop($list);
+        }
         
+        $this->where($list);
+        $this->deleteBuild();
+        return $this->query();
     }
     
     public function setSql($sql)
@@ -240,7 +286,23 @@ class Database extends Base
                     }
                     $this->where .= ' AND ';
                 }
+                
                 $this->where = rtrim($this->where, 'AND ');
+            } elseif (is_array($key)) {
+                if ($this->isIndexArray($key)) {
+                    foreach ($key as $val) {
+                        $this->where .= "id='" . $val . "', AND ";
+                    }
+                } else {
+                    foreach ($key as $k => $v) {
+                        $this->where .= '`' . $key . "`='" . $val . "', AND ";
+                    }
+                }
+                
+                $this->where = rtrim(trim(rtrim(rtrim($this->where), 'AND')), ',');
+                
+            } else {
+               
             }
         } catch (Exception $e) {
             $this->where = false;
@@ -353,7 +415,7 @@ class Database extends Base
         } else {           
             if ($val1 !== false) {
                 if (is_numeric($val1)) {
-                    $this->sql = $this->$this->buildSelect();
+                    $this->sql = $this->$this->selectBuild();
                     $fetchType = $val1 ? true : false;
                 } else {
                     $this->sql = $val1;
@@ -363,34 +425,19 @@ class Database extends Base
             
             if ($val2 !== false) {
                 if (is_numeric($val2)) {
-                    $this->sql = $this->$this->buildSelect();
+                    $this->sql = $this->$this->selectBuild();
                     $fetchType = $val2 ? true : false;
                 } else {
                     $this->sql = $val2;
                     $fetchType = $val1;
                 }
             }
-            
-//            $this->stmt = $this->db->prepare($this->sql);
         }
 
-        $this->beforeQuery();
-        $this->query();
-
-        if ($this->stmt->rowCount()) {
-            $this->totalRow = $this->stmt->rowCount() ? $this->stmt->rowCount() : 0;
-            $this->result = $this->stmt->fetchAll($fetchType ? PDO::FETCH_NUM : PDO::FETCH_ASSOC);
-        } else {
-            //statement
-        }
+        $this->query($fetchType);
         $this->clearQueryVariable();
         
         return $this->result;
-    }
-    
-    private function clearQueryVariable()
-    {
-        $this->tmpTable = false;
     }
     
     private function resolve($str)
@@ -399,7 +446,7 @@ class Database extends Base
         return str_pad($str, strlen($str) + 2, ' ', STR_PAD_BOTH);
     }
     
-    private function buildSelect()
+    private function selectBuild()
     {
         $selectList = explode(',', trim(trim(trim($this->select), 'SELECT'), ' '));
         
@@ -448,6 +495,11 @@ class Database extends Base
         }
     }
     
+    private function updateBuild()
+    {
+        $this->sql = 'UPDATE ' . $this->tmpTable . $this->set . $this->where;
+    }
+    
     private function insertBuild()
     {
         if ($this->from === 'from') {
@@ -455,13 +507,70 @@ class Database extends Base
         } else {
             $table = trim(str_replace('from', '', $this->from));
         }
-        $this->action = '123';
+        $this->action = preg_replace('/(.*)([A-Z].*)/', '$1', __FUNCTION__);
         
         $this->sql = 'INSERT INTO `' . $table . '`' . $this->insertField;
         
         return $this->sql;
     }
 
+    public function deleteBuild()
+    {
+        $this->sql = 'DELETE FROM ' . str_pad($this->tmpTable, strlen($this->tmpTable) + 2, ' ', STR_PAD_BOTH) . $this->where;
+    }
+    
+    public function join($char = '&')
+    {
+        switch (strtolower($char)) {
+            case '&' :
+            case 'and' :
+                $this->join = str_pad($char, strlen($char) + 2, ' ', STR_PAD_BOTH);
+                break;
+            case '' :
+                break;
+            case '' :
+                break;
+            case '' :
+                break;
+            default :
+                break;
+        }
+        
+        return $this;
+    }
+    
+    /**
+     * Judge a array whether the array is a index arrar or a associative array
+     * 
+     * Index array like array(1, 2, 3)
+     * 
+     * Associative array liek array('id' => 1, 'name' => 'someone')
+     * 
+     * @param array $arr
+     * 
+     * @return boolean
+     */
+    public function isIndexArray($arr = array())
+    {
+        return array_keys($arr) == range(0, count($arr) - 1) ? true : false;
+    }
+        
+    /**
+     * Clear all the query variable for the next query statement
+     * 
+     * Remain the result collection and  the database connection information
+     */
+    public function clearQueryVariable()
+    {
+        $reflect = new ReflectionClass($this); 
+        $attr = $reflect->getDefaultProperties();
+        foreach ($attr as $key => $val) {
+            if ($key !== 'db' && $key !== 'result'){
+                $this->$key = $val;
+            }
+        }
+    }
+    
     private function getConnect()
     {
         if ($this->params['dbconfig']['pdo']) {
